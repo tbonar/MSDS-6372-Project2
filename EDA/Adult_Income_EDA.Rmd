@@ -10,8 +10,21 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(naniar)
+library(GGally)
+library(funModeling)
+library(Hmisc)
 
 setwd(".")
+
+basic_eda <- function(data) # Sample Function Source: https://blog.datascienceheroes.com/exploratory-data-analysis-in-r-intro/
+{
+  glimpse(data)
+  print(status(data))
+  freq(data) 
+  print(profiling_num(data))
+  plot_num(data)
+  describe(data)
+}
 
 ```
 
@@ -21,20 +34,10 @@ adult_income <- read.csv(file = "../data/adult.data", header=FALSE, quote="", na
 
 colnames(adult_income) <- c("age","workclass","fnlwgt","education","education_num","marital_status","occupation","relationship","race","sex","capital_gain","capital_loss","hours_per_week","native_country","income_status")
 
-summary(adult_income) # Check initial import types
-
 sum(complete.cases(adult_income)) # Complete rows are 30162
 sum(!complete.cases(adult_income)) # Missing 2399 
 
 colSums(is.na(adult_income)) # Counts the number of NAs for each column - majority in occupation, workclass, and native_country
-
-vis_miss(adult_income, cluster = F) + # Without aggregating observations
-  labs(title = "NAs in Adult Income from Census of 1996 ") +
-  theme(axis.text.x = element_text(angle=90))
-
-# Those missing a work class and occupation may be overlapping, though overall only 0.9% of data is missing
-
-gg_miss_upset(adult_income) # Here we can see an aggregation via upset plot (reference: https://www.youtube.com/watch?v=-IfF2wGw7Qk )
 
 # Transform some character classes into a factor class
 adult_income$workclass <- factor(adult_income$workclass)
@@ -47,6 +50,21 @@ adult_income$sex <- factor(adult_income$sex)
 adult_income$native_country <- factor(adult_income$native_country)
 adult_income$income_status <- factor(adult_income$income_status)
 
-summary(adult_income) # New stats looking closer at things
+```
+
+```{r data-inspection}
+basic_eda(adult_income) # initial look at data
+
+vis_miss(adult_income, cluster = F) + # Without aggregating observations
+  labs(title = "NAs in Adult Income from Census of 1996 ") +
+  theme(axis.text.x = element_text(angle=90))
+
+# Those missing a work class and occupation may be overlapping, though overall only 0.9% of data is missing
+
+gg_miss_upset(adult_income) # Here we can see an aggregation via upset plot (reference: https://www.youtube.com/watch?v=-IfF2wGw7Qk )
+
+ggcorr(data=adult_income, label = T, nbreaks=5, label_size = 3, hjust = 0.9, size = 3, layout.exp = 4) +
+  labs(title = "Multicollinearity of Variables (Pairwise / Pearson's correlation)")
+# No major collinearity variables for continuous variables 
 ```
 
