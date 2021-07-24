@@ -68,3 +68,12 @@ ggcorr(data=adult_income, label = T, nbreaks=5, label_size = 3, hjust = 0.9, siz
 # No major collinearity variables for continuous variables 
 ```
 
+# Logistic Regression Assumptions
+1. Response Variable is __binary__
+2. Observations are __independent__
+3. No multicollinearity among explanatory variables
+4. No extreme outliers
+5. There is a linear relationship between explanatory variables jand the logit of the response variable
+6. The sample size is sufficiently large
+
+
