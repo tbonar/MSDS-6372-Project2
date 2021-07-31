@@ -1,0 +1,28 @@
+---
+title: "Bank Analysis And Modeling"
+author: "Taylor Bonar & Michael Burgess & Rashmi Patel"
+date: "7/30/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(naniar)
+library(GGally)
+library(funModeling)
+library(Hmisc)
+setwd(".")
+basic_eda <- function(data) # Sample Function Source: https://blog.datascienceheroes.com/exploratory-data-analysis-in-r-intro/
+{
+  glimpse(data)
+  print(status(data))
+  freq(data) 
+  print(profiling_num(data))
+  plot_num(data)
+  describe(data)
+}
+```
+
+#
