@@ -101,8 +101,48 @@ full_bank <- read.csv("./bank-additional/bank-additional-full.csv", header = T, 
 # Use function to create initial data insights for bank data
 basic_eda(full_bank)
 
+# Create a bird's eye view of missing data using naniar library if missing data exists
+if(sum(!complete.cases(full_bank)) > 0)
+{
+  vis_miss(full_bank, cluster = F) + # Without aggregating observations
+  labs(title = "NAs in Bank Data from May 2008 - Nov 2010") +
+  theme(axis.text.x = element_text(angle=90))
+}
+
 # Transform all chr objects in data frame to a factor class as a secondary data frame object
 full_bank_2 <- as.data.frame(unclass(full_bank), stringsAsFactors = T)
 ```
+
+# Logistic Regression Modeling
+As we have examined the model above, we are looking to see if with a direct marketing campaign, via phone calls, will allow us to predict whether or not a client will subscribe for a term deposit. Before we begin, let's have an initial look at our data and see if we can use logistic regression for prediction classification.
+
+## Model Selection
+Before we check the assumptions for logistic regression, we will use several means of automatic model selection to see what out of the 21 variables may be more useful for our logistic regression model. Once we've reduced our variables, we can then proceed forward with checking the assumptions.
+
+### LASSO
+```{r LASSO logistic model}
+
+```
+
+### RIDGE
+```{r RIDGE logistic model}
+
+```
+
+### ELASTIC NET
+```{r ELASTIC NET logistic model}
+
+```
+
+## Assumptions Investigation
+```{r logistic regression assumptions}
+
+```
+
+## Interpreting the Parameters
+
+
+## Conclusion
+
 
 
