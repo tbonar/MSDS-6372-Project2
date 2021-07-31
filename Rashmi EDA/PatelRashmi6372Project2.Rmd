@@ -1,0 +1,322 @@
+---
+title: "Bank 6372 Project 2"
+author: "Rashmi Patel"
+date: "7/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,warning=FALSE,message=FALSE}
+library(ellipsis)
+library(tidyverse)
+library(corrplot)
+library(mlbench)
+library(caret)
+library(skimr)
+library(mice)
+library(purrr)
+library(ggplot2)
+library(ggthemes)
+library(cowplot)
+library(class)
+library(e1071)
+library(grid)
+library(tidyr)
+library(stringr)
+library(naniar)
+library(car)
+library(MASS)
+library(caret)
+library(ROCR)
+library(glmnet)
+library(bestglm)
+library(car)
+library(ResourceSelection)
+library(randomForest)
+library('SmartEDA')
+library(kableExtra)
+library(DataExplorer)
+```
+# Load the data from Github 
+```{r}
+bank=read_delim("https://raw.githubusercontent.com/RashmiAPatel19/SMU-6372-Applied-Stats/main/Project%202/data/bank-additional-full.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+bank
+```
+# Addressing Summary of the Bank data
+```{r}
+head(bank)
+tail(bank)
+str(bank)
+dim(bank)
+names(bank)
+summary(bank)
+```
+# Addressing missing values
+
+* There is no missing values
+
+```{r}
+# Checking for missing values
+sum(is.na(bank))
+
+```
+
+# Addressing Character Variable and Numeric Variable 
+```{r}
+# Checking the dimensions of the dataset
+dim(bank)
+# Checking the column names of the dataset
+colnames(bank)
+# Looking at the summary of the dataset
+summary(bank)
+# Checking for data types of the columns of the dataset
+str(bank)
+# Checking for number of columns with numeric type
+numeric_var_who=sum(sapply(bank[,1:21],is.numeric))
+numeric_var_who
+# Checking for number of columns with character type
+char_var_who=sum(sapply(bank[,1:21],is.character))
+char_var_who
+# Checking for column names with numeric type
+numeric_varname_who=which(sapply(bank[,1:21],is.numeric))
+numeric_varname_who
+# Checking for column names with character type
+char_varname_who=which(sapply(bank[,1:21],is.character))
+char_varname_who
+```
+
+# Looking at the normality of Numeric Variables
+```{r}
+
+plot_histogram(bank)
+
+```
+
+# Looking at the graph for Response variable
+```{r}
+
+ggplot(bank,aes(x=y,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+
+```
+# 
+```{r}
+# Age vs Response
+ggplot(bank,aes(x=age,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)
+# Job vs Response
+ggplot(bank,aes(x=job,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle=90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Marital Status vs Response
+ggplot(bank,aes(x=marital,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Education vs Response
+ggplot(bank,aes(x=education,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Housing vs Response
+ggplot(bank,aes(x=housing,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Default vs Response
+ggplot(bank,aes(x=default,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Loan vs Response
+ggplot(bank,aes(x=loan,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Contact vs Response
+ggplot(bank,aes(x=contact,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Day of the week vs Response
+ggplot(bank,aes(x=day_of_week,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Duration vs Response
+ggplot(bank,aes(x=duration,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Campaign vs Response
+ggplot(bank,aes(x=campaign,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Pdays vs Response
+ggplot(bank,aes(x=pdays,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Previous vs Response
+ggplot(bank,aes(x=previous,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Poutcome vs Response
+ggplot(bank,aes(x=poutcome,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Emp.var.Rate vs Response
+ggplot(bank,aes(x=emp.var.rate,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Cons.price.idx vs Response
+ggplot(bank,aes(x=cons.price.idx,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Cons.conf.idx vs Response
+ggplot(bank,aes(x=cons.cond.idx,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Euribor3m vs Response
+ggplot(bank,aes(x=euribor3m,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# nr.employed vs Response
+ggplot(bank,aes(x=nr.employed,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Month vs Response
+ggplot(bank,aes(x=month,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+
+
+```
+This table shows the correlation between the numerical variables
+
+ - nr.employed and emp.var.rate are 91% correlated. 
+ - nr.employed and euribor3m are 95% correlated.
+ - emp.var.rate and euribor3m are 97% correlated.
+ - cons.price.idx and emp.var.rate are 78% correlated.
+ - cons.price.idx and euribor3m are 69% correlated.
+ - cons.price.idx and nr.employed are 52% correlated.
+ 
+Later we will examine pairwise multicolinearity within the continuous explanatory variables and VIF to see if which explanatory variables may be redundant.
+
+```{r}
+corrdfTraintable <- bank %>% keep(is.numeric) %>% na.omit %>% cor %>% view
+
+bank %>% keep(is.numeric) %>% na.omit %>% cor %>% corrplot("upper", addCoef.col = "black", number.digits = 2, number.cex = 0.5, method="shade", order = "hclust", tl.srt=45, tl.cex = 0.8)
+
+view(corrdfTraintable)
+
+```
+We don't observe any multicolinearity within the numeric responses, and don't see any need to remove any based on pairwise comparison. 
+
+```{r}
+
+my.cor <- cor(bank %>% keep(is.numeric) %>% na.omit)
+
+library(gplots)
+library(ggplot2)
+heatmap.2(my.cor,col=redgreen(75), 
+          density.info="none", trace="none", dendrogram=c("row"), 
+          symm=F,symkey=T,symbreaks=T, scale="none")
+
+
+#Another option here would be to do PCA among the continous predictors to see
+#if they seperate out.  Or a heatmap.
+pc.result<-prcomp(bank %>% keep(is.numeric) %>% na.omit,scale.=TRUE)
+pc.scores<-pc.result$x
+pc.scores<-data.frame(pc.scores)
+pc.scores$y<-bank$y
+
+
+#Use ggplot2 to plot the first few pc's
+ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+
+ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+
+ggplot(data = pc.scores, aes(x = PC3, y = PC4)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+
+# we don't really see much separation with PCA
+
+```
+Missing values are disguised as unknown values in the data set and we devised a code to show them all
+
+ default           8597
+ education         1731
+ housing            990
+ loan               990
+ job                330
+ marital             80
+ 
+ For Marital, housing and job it is safe to remove the unknown values as they're so little they won't have an effect on the rest of the distribution
+ 
+ * Looking at default is has no information as it is highly skewed towards "no" as only 3 counts comes up as "yes" so we are removing "default" as well.
+ 
+ 
+ 
+ 
+```{r}
+bank %>% 
+  summarise_all(list(~sum(. == "unknown"))) %>% 
+  gather(key = "variable", value = "nr_unknown") %>% 
+  arrange(-nr_unknown)
+
+summary(bank$job)
+summary(bank$default)
+summary(bank$education)
+summary(bank$loan)
+summary(bank$marital)
+summary(bank$housing)
+
+bank <- subset(bank, job!="unknown")
+bank <- subset(bank, marital!="unknown")
+bank <- subset(bank, housing!="unknown")
+bank <- subset(bank, loan!="unknown")
+bank <- subset(bank, default!="unknown")
+bank <- subset(bank, education!="unknown")
+
+
+```
+```{r}
+
+library("dplyr")
+ShowPieChart <- function(columnBy, columnToShow, titleName)
+{
+  df <- dplyr::group_by(bank, .dots = c(columnBy, columnToShow)) %>%
+    dplyr::summarize(counts = n()) %>%
+    dplyr::mutate(perc = (counts / sum(counts)) * 100) %>%
+    dplyr::arrange_(.dots=c(columnBy, columnToShow))
+ 
+  
+  # preparing the plot
+  ggplot2::ggplot(df, aes('', counts)) +
+    geom_col(
+      position = 'fill',
+      color = 'black',
+      width = 1,
+      aes(fill = y)
+    ) +
+    ggtitle(titleName) +
+    facet_wrap(paste("~",columnBy), labeller = "label_both") +
+    geom_label(
+      aes(label = paste0(round(perc), "%"), group = "y"),
+      position = position_fill(vjust = 0.5),
+      color = 'black',
+      size = 5,
+      show.legend = FALSE
+    ) + scale_fill_discrete(name = "Outcome:") +
+    coord_polar(theta = "y")
+}
+ShowPieChart("job", "y", "Outcome by Job")
+ShowPieChart("marital", "y", "Outcome by Marital Status")
+ShowPieChart("education", "y", "Outcome by Education")
+ShowPieChart("housing", "y", "Outcome by Housing")
+ShowPieChart("default", "y", "Outcome by Credit In Default")
+ShowPieChart("loan", "y", "Outcome by loan status")
+ShowPieChart("contact", "y", "Outcome by Contact")
+ShowPieChart("poutcome", "y", "Outcome by poutcome")
+ 
+```
