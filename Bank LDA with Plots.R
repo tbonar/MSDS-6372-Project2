@@ -37,6 +37,8 @@ mylda
 #make predictions and find accuracy
 predictions <- mylda %>% predict(test.data)
 mean(predictions$class==test.data$y)
+CM = confusionMatrix(table(predictions$class,test.data$y))
+CM
 
 #plot ld1
 plot(mylda)
