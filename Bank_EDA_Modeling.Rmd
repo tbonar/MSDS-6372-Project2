@@ -8,11 +8,15 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
-library(tidyverse)
-library(naniar)
-library(GGally)
-library(funModeling)
-library(Hmisc)
+library(tidyverse) # Data handling
+library(naniar) # Viz on Missing Data
+library(GGally) # Graphs!
+library(funModeling) # Helpful Functions for EDA Function
+library(Hmisc) # Helpful Functions for EDA Function
+library(caret) # Data Partitioning
+library(glmnet) # Modeling
+library(coefplot) # Coefficient modeling of glmnet objects
+
 setwd(".")
 basic_eda <- function(data) # Sample Function Source: https://blog.datascienceheroes.com/exploratory-data-analysis-in-r-intro/
 {
@@ -86,7 +90,7 @@ As described by the UCI Machine Learning Repository, each of the variables/colum
 >
 >21 - y - has the client subscribed a term deposit? (binary: 'yes','no')
 
-Another caution we will need to access is that within this dataset, there is potential for more than one contact to the same client as it was required to access the product, a bank term deposit would or would not be subscribed.
+Another caution we will need to access is that within this dataset, there is potential for more than one contact to the same client. This repeat contact was necessary as it was required to assess the product (i.e. a bank term deposit) and whether the client would or would not be subscribed.
 
 ```{r EDA}
 # Retrieve datasets zip
@@ -117,22 +121,50 @@ full_bank_2 <- as.data.frame(unclass(full_bank), stringsAsFactors = T)
 As we have examined the model above, we are looking to see if with a direct marketing campaign, via phone calls, will allow us to predict whether or not a client will subscribe for a term deposit. Before we begin, let's have an initial look at our data and see if we can use logistic regression for prediction classification.
 
 ## Model Selection
-Before we check the assumptions for logistic regression, we will use several means of automatic model selection to see what out of the 21 variables may be more useful for our logistic regression model. Once we've reduced our variables, we can then proceed forward with checking the assumptions.
+Before we check the assumptions for logistic regression, we will use several means of automatic model selection to see what out of the 21 variables may be more useful for our logistic regression model. Once we've reduced our variables, we can then proceed forward with checking the assumptions. For our models, we'll use a 80/20 split of the data for predictions.
+
+```{r data-split}
+set.seed(2008)
+
+training_samples <- full_bank_2$y %>% createDataPartition(p=0.8, list = F)
+
+train.data <- full_bank_2[training_samples,]
+test.data <- full_bank_2[-training_samples,]
+
+# Create matrix of predictors & convert to categorical predictors to appropriate dummy values
+## Dummy code categorical predictor variables
+x <- model.matrix(y~., train.data)[,-1]
+## Convert outcome/class to numerical variable
+y <- ifelse(train.data$y == "no", 1, 0)
+
+# Source on stepping through Penalized Logistic Regression: http://www.sthda.com/english/articles/36-classification-methods-essentials/149-penalized-logistic-regression-essentials-in-r-ridge-lasso-and-elastic-net/#compute-lasso-regression
+```
 
 ### LASSO
 ```{r LASSO logistic model}
+# Set seed and find ideal lambda for LASSO
+set.seed(2008)
+cv.l.model <- cv.glmnet(x, y, family = "binomial", alpha = 1) # Remeber alpha=1 means LASSO Regression
 
+# Plot of ideal lambda for minimizing CV error
+plot(cv.l.model)
+
+# Comparing Regression Coefficients from CV of lambda
+coefplot(cv.l.model, lambda=cv.l.model$lambda.min, family="binomial")
+coef(cv.l.model, cv.l.model$lambda.min)
+
+coef(cv.l.model, cv.l.model$lambda.1se)
+coefplot(cv.l.model, lambda=cv.l.model$lambda.1se, family="binomial")
+
+# Graphic to interact with lambda and coeficients
+coefpath(cv.l.model)
+
+# Fit a model w/ ideal lambda from cross-validation
+l.model <- glmnet(x, y, alpha = 1, family="binomial", lambda = cv.l.model$lambda.1se)
 ```
+As we do not have an analyst to help specify the lambda value to use in our LASSO model to control the coefficient shrinkage, we elected to use cross-validation error to find a suitable lambda for our data. As can be observed, when examining the cross-validation error according to the log of lambda, our left dashed vertical line indicates the optimal value of -6.
 
-### RIDGE
-```{r RIDGE logistic model}
-
-```
-
-### ELASTIC NET
-```{r ELASTIC NET logistic model}
-
-```
+When choosing which lambda value to use when fitting our model, we generally want a balance between accuracy but also simplicity. That way, we can easily interpret the model if need be. Looking closer, we can examine from the coefficient tables, which lambda will provide a simple model. In this case, the within 1 standard error (1se) lambda has 25 variables that have non-zero coefficients, while our minimum lambda has 7 non-zero coefficients. For our initial model, we will use within 1 standard error lambda to produce a simpler model for understanding rather than for accuracy.
 
 ## Assumptions Investigation
 ```{r logistic regression assumptions}
