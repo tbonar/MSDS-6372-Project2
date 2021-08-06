@@ -141,7 +141,7 @@ y <- ifelse(train.data$y == "no", 1, 0)
 ```
 
 ### LASSO
-```{r LASSO logistic model}
+```{r LASSO Lambda}
 # Set seed and find ideal lambda for LASSO
 set.seed(2008)
 cv.l.model <- cv.glmnet(x, y, family = "binomial", alpha = 1) # Remeber alpha=1 means LASSO Regression
@@ -158,18 +158,57 @@ coefplot(cv.l.model, lambda=cv.l.model$lambda.1se, family="binomial")
 
 # Graphic to interact with lambda and coeficients
 coefpath(cv.l.model)
-
-# Fit a model w/ ideal lambda from cross-validation
-l.model <- glmnet(x, y, alpha = 1, family="binomial", lambda = cv.l.model$lambda.1se)
 ```
 As we do not have an analyst to help specify the lambda value to use in our LASSO model to control the coefficient shrinkage, we elected to use cross-validation error to find a suitable lambda for our data. As can be observed, when examining the cross-validation error according to the log of lambda, our left dashed vertical line indicates the optimal value of -6.
 
 When choosing which lambda value to use when fitting our model, we generally want a balance between accuracy but also simplicity. That way, we can easily interpret the model if need be. Looking closer, we can examine from the coefficient tables, which lambda will provide a simple model. In this case, the within 1 standard error (1se) lambda has 25 variables that have non-zero coefficients, while our minimum lambda has 7 non-zero coefficients. For our initial model, we will use within 1 standard error lambda to produce a simpler model for understanding rather than for accuracy.
 
-## Assumptions Investigation
-```{r logistic regression assumptions}
+```{R LASSO-model}
+set.seed(2008)
+
+# Fit a model w/ ideal lambda from cross-validation
+l.model <- glmnet(x, y, alpha = 1, family="binomial", lambda = cv.l.model$lambda.1se)
+
+# Predict on test data
+x.test <- model.matrix(y~., test.data)[,-1]
+probabilities <- l.model %>% predict(newx = x.test, type="response")
+predicted.classes <- ifelse(probabilities > 0.5, "no", "yes")
+
+# Accuracy Rate
+observed.classes <- test.data$y
+mean(predicted.classes == observed.classes)
 
 ```
+
+## Assumptions Investigation
+
+Before we fit the model, we should do preliminary assumptions check for logistic regression
+
+### Binary/Ordinal Response Variable
+
+### Independent Observations
+
+### Linearity of Continuous/Scale Variables vs. Log Odds of Response Variable
+
+```{r linearity-assumption}
+numeric_pred <- test.data %>% select_if(is.numeric)
+numeric_pred_names <- colnames(numeric_pred)
+
+# binding logit and numeric predictors for scatterplots
+linearity_data <- numeric_pred %>%
+  mutate(logit = log(probabilities/(1-probabilities))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+ggplot(linearity_data, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess", formula = "y~x") + 
+  theme_bw() + 
+  facet_wrap(~predictors, scales = "free_y")
+```
+
+### Multicollinearity of Explanatory Variables
+
+### Outliers and Influential Observations
 
 ## Interpreting the Parameters
 
