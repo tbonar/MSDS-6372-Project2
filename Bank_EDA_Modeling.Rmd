@@ -27,6 +27,9 @@ basic_eda <- function(data) # Sample Function Source: https://blog.datasciencehe
   plot_num(data)
   describe(data)
 }
+
+# logit^{-1}: Can use to convert results of logistic regression to probability
+invlogit <- function(x) {1 / (1 + exp(-x))}
 ```
 # Introduction
 The goal of this paper is to investigate banking data via an exploratory data analysis. Once we have initially examined the data, we will then move forward with attempting a classification model via logistic regression for predicting whether or not a client will subscribe to a banking institution given a direct marketing campaign taking place.
@@ -112,33 +115,43 @@ if(sum(!complete.cases(full_bank)) > 0)
   labs(title = "NAs in Bank Data from May 2008 - Nov 2010") +
   theme(axis.text.x = element_text(angle=90))
 }
-
-# Transform all chr objects in data frame to a factor class as a secondary data frame object
-full_bank_2 <- as.data.frame(unclass(full_bank), stringsAsFactors = T)
 ```
 
 As we can see in the initial EDA, we have a small percentage of data that is marked unknown. As we cannot accurately categorize this data into their appropriate categories, we'll convert this data into NAs and drop them since they are at most 1.5% of the total data.
 ```{r unknown-transformation}
-full_bank_NAs <- full_bank_2 %>% replace_with_na_all(condition = ~.x == "unknown")
+full_bank[full_bank=="unknown"] <- NA
 
-basic_eda(full_bank_NAs)
+basic_eda(full_bank)
 
 # Create a bird's eye view of missing data using naniar library if missing data exists
-vis_miss(full_bank_NAs, cluster = F) + # Wi
+vis_miss(full_bank, cluster = F) + # Wi
 labs(title = "NAs in Bank Data from May 2008 - Nov 2010") +
 theme(axis.text.x = element_text(angle=90))
 
-gg_miss_upset(full_bank_NAs)
+gg_miss_upset(full_bank)
 ```
 Some interesting notes on the missing data is that the majority of the data seems to be the unknown status of whether an individual has defaulted on their credit or not. If default becomes a major predictor for whether a client will subscribe to a bank term deposit or not, some research should be explored here to discover why we cannot accurately define whether an individual defaults on their credit or not.
 
 ```{r remove-NAs}
-complete_full_bank <- full_bank_NAs[complete.cases(full_bank_NAs),]
+complete_full_bank <- full_bank[complete.cases(full_bank),]
+
+# Transform all chr objects in data frame to a factor class as a secondary data frame object
+complete_full_bank <- as.data.frame(unclass(complete_full_bank), stringsAsFactors = T)
 
 vis_miss(complete_full_bank, cluster = F) + # Without aggregating observations b/c takes too long to aggregate
 labs(title = "Cleaned Observations in Bank Data from May 2008 - Nov 2010") +
 theme(axis.text.x = element_text(angle=90))
 ```
+Now we have no missing data.
+
+### Is our Response Variables Unbalanced?
+
+```{r is-data-balanced}
+prop.table(table(complete_full_bank$y))
+freq(complete_full_bank, input="y")
+```
+
+Looking closer at our response variable, we have a significant lower percentage of yes's versus no's (12.66% yes's to 87.34% no's). With this in mind, we'll need to ensure either our sampling is weighted, or consider algorithms that can oversample or undersample when fitting our logistic regression model, otherwise we may introduce bias and lower our accuracy on predicting when a client successfully subscribes to a bank term deposit.
 
 ## Assumptions Investigation
 
@@ -146,14 +159,14 @@ Before we fit the model, we should do preliminary assumptions check for logistic
 
 ### Binary/Ordinal Response Variable
 ```{r response-variable-assumption}
-nlevels(full_bank_2$y)
-levels(full_bank_2$y)
+nlevels(complete_full_bank$y)
+levels(complete_full_bank$y)
 ```
-As you can see above, our response variable, y, consists of two levels, resulting in a binary response. We will move forward with a binary logistic regression model instead of an ordinal logistic regression model.
+As you can see above, our response variable, y, consists of two levels, resulting in a binary response. We will move forward with a binary logistic regression model instead of an ordinal logistic regression model. 
 
 ### Independent Observations
 ```{r residuals}
-numeric_pred <- full_bank_2 %>% select_if(is.numeric)
+numeric_pred <- complete_full_bank %>% select_if(is.numeric)
 numeric_pred_names <- colnames(numeric_pred)
 ```
 
@@ -197,8 +210,8 @@ set.seed(2008)
 
 training_samples <- complete_full_bank$y %>% createDataPartition(p=0.8, list = F)
 
-train.data <- full_bank_2[training_samples,]
-test.data <- full_bank_2[-training_samples,]
+train.data <- complete_full_bank[training_samples,]
+test.data <- complete_full_bank[-training_samples,]
 
 # Create matrix of predictors & convert to categorical predictors to appropriate dummy values
 ## Dummy code categorical predictor variables
