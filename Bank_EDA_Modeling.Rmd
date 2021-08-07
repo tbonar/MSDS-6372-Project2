@@ -12,12 +12,14 @@ library(tidyverse) # Data handling
 library(naniar) # Viz on Missing Data
 library(GGally) # Graphs!
 library(DataExplorer) # More Graphs!
+library(ggplot2) # More more Graphs!
 library(funModeling) # Helpful Functions for EDA Function
 library(Hmisc) # Helpful Functions for EDA Function
 library(caret) # Data Partitioning
 library(glmnet) # Modeling
 library(coefplot) # Coefficient modeling of glmnet objects
 library(corrplot) # Correlation Plotting
+library(car) # vif function
 
 setwd(".")
 basic_eda <- function(data) # Sample Function Source: https://blog.datascienceheroes.com/exploratory-data-analysis-in-r-intro/
@@ -38,7 +40,7 @@ The goal of this paper is to investigate banking data via an exploratory data an
 
 # Exploratory Data Analysis
 
-The data we'll be exploring is from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) relating to the direct marketing campaigns of a Portuguese banking institution. The initial data set consists of 45,211 observations with 20 inputs, dating between May 2008 to November 2010.
+The data we'll be exploring is from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) relating to the direct marketing campaigns of a Portuguese banking institution. The initial data set consists of 41,188 observations with 20 inputs, dating between May 2008 to November 2010.
 
 As described by the UCI Machine Learning Repository, each of the variables/columns are described as:
 
@@ -178,8 +180,7 @@ As you can see above, our response variable, y, consists of two levels, resultin
 
 ### Independent Observations
 ```{r residuals}
-numeric_pred <- complete_full_bank %>% select_if(is.numeric)
-numeric_pred_names <- colnames(numeric_pred)
+
 ```
 
 ### Linearity of Continuous/Scale Variables vs. Log Odds of Response Variable
@@ -214,14 +215,12 @@ numeric_pred_names <- colnames(numeric_pred)
  
 * Later we will examine pairwise multicolinearity within the continuous explanatory variables and VIF to see if which explanatory variables may be redundant.
 
-```{r}
+```{r Correlation}
 corrdfTraintable <- complete_full_bank %>% 
-  keep(is.numeric) %>% 
-  na.omit %>% 
-  cor %>% 
-  view
+  keep(is.numeric) %>%
+  cor
 
-view(corrdfTraintable)
+corrdfTraintable
 
 complete_full_bank %>% keep(is.numeric) %>% 
   cor %>% 
@@ -238,6 +237,68 @@ ggcorr(data=complete_full_bank, label = T, nbreaks=5, label_size = 3, hjust = 0.
   labs(title = "Multicollinearity of Variables (Pairwise / Pearson's correlation)")
 ```
 We don't observe any multicolinearity within the numeric responses, and don't see any need to remove any based on pairwise comparison. 
+
+## PCA Examination
+```{r PCA}
+numeric_preds_bank <- complete_full_bank %>% keep(is.numeric)
+my.cor <- cor(numeric_preds_bank)
+library(gplots)
+library(ggplot2)
+heatmap.2(my.cor,
+          col=redgreen(75), 
+          density.info="none", 
+          trace="none", 
+          dendrogram=c("row"), 
+          symm=F,
+          symkey=T,
+          symbreaks=T,
+          scale="none", 
+          srtCol = 35)
+#Another option here would be to do PCA among the continous predictors to see
+#if they seperate out.  Or a heatmap.
+pc.result<-prcomp(numeric_preds_bank %>% keep(is.numeric),scale.=TRUE)
+pc.scores<-pc.result$x
+pc.scores<-data.frame(pc.scores)
+pc.scores$y<-complete_full_bank$y
+#Use ggplot2 to plot the first few pc's
+ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+ggplot(data = pc.scores, aes(x = PC3, y = PC4)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+```
+There does not seem to be a large separation with PCA.
+
+### GLM Logistic
+ Below are the variables that have VIF greater than 10
+* emp.var.rate
+* nr.employed
+* euribor3m
+* cons.price.idx
+
+Because `emp.var.rate`, `nr.employed`, `euribor3m`, and `cons.price.idx` are so highly correlated with each other, and all have high VIFs, we will start by removing `nr.employed` first, and re-evaluate. 
+
+```{r VIF}
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+cols <- c(colnames(complete_full_bank))
+# removing columns that do not provide any value and the response
+cols <- cols[cols %!in% c("y","default","lgcampaign","pdays")]
+fmla.all <- as.formula(paste("y ~ ", paste(cols, collapse= "+")))
+bankModel <- glm(fmla.all, complete_full_bank, family = binomial(link="logit"))
+(vif(bankModel)[,3])^2
+# removing columns that are highly correlated and with high VIF
+cols.lowvif <- cols[cols %!in% c("nr.employed","emp.var.rate")]
+# creating the formula for a full model after removing the necessary variables
+fmla.lowvif <- as.formula(paste("y ~ ", paste(cols.lowvif, collapse= "+")))
+bankModel.lowvif <- glm(fmla.lowvif, complete_full_bank, family = binomial(link="logit"))
+# re-examining the VIF after removing variables with high VIF
+(vif(bankModel.lowvif)[,3])^2
+```
 
 ### Outliers and Influential Observations
 
