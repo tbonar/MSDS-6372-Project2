@@ -117,6 +117,75 @@ if(sum(!complete.cases(full_bank)) > 0)
 full_bank_2 <- as.data.frame(unclass(full_bank), stringsAsFactors = T)
 ```
 
+As we can see in the initial EDA, we have a small percentage of data that is marked unknown. As we cannot accurately categorize this data into their appropriate categories, we'll convert this data into NAs and drop them since they are at most 1.5% of the total data.
+```{r unknown-transformation}
+full_bank_NAs <- full_bank_2 %>% replace_with_na_all(condition = ~.x == "unknown")
+
+basic_eda(full_bank_NAs)
+
+# Create a bird's eye view of missing data using naniar library if missing data exists
+vis_miss(full_bank_NAs, cluster = F) + # Wi
+labs(title = "NAs in Bank Data from May 2008 - Nov 2010") +
+theme(axis.text.x = element_text(angle=90))
+
+gg_miss_upset(full_bank_NAs)
+```
+Some interesting notes on the missing data is that the majority of the data seems to be the unknown status of whether an individual has defaulted on their credit or not. If default becomes a major predictor for whether a client will subscribe to a bank term deposit or not, some research should be explored here to discover why we cannot accurately define whether an individual defaults on their credit or not.
+
+```{r remove-NAs}
+complete_full_bank <- full_bank_NAs[complete.cases(full_bank_NAs),]
+
+vis_miss(complete_full_bank, cluster = F) + # Without aggregating observations b/c takes too long to aggregate
+labs(title = "Cleaned Observations in Bank Data from May 2008 - Nov 2010") +
+theme(axis.text.x = element_text(angle=90))
+```
+
+## Assumptions Investigation
+
+Before we fit the model, we should do preliminary assumptions check for logistic regression
+
+### Binary/Ordinal Response Variable
+```{r response-variable-assumption}
+nlevels(full_bank_2$y)
+levels(full_bank_2$y)
+```
+As you can see above, our response variable, y, consists of two levels, resulting in a binary response. We will move forward with a binary logistic regression model instead of an ordinal logistic regression model.
+
+### Independent Observations
+```{r residuals}
+numeric_pred <- full_bank_2 %>% select_if(is.numeric)
+numeric_pred_names <- colnames(numeric_pred)
+```
+
+### Linearity of Continuous/Scale Variables vs. Log Odds of Response Variable
+
+```{r linearity-assumption}
+# numeric_pred <- test.data %>% select_if(is.numeric)
+# numeric_pred_names <- colnames(numeric_pred)
+# 
+# # binding logit and numeric predictors for scatterplots
+# linearity_data <- numeric_pred %>%
+#   mutate(logit = log(probabilities/(1-probabilities))) %>%
+#   gather(key = "predictors", value = "predictor.value", -logit)
+# 
+# ggplot(linearity_data, aes(logit, predictor.value))+
+#   geom_point(size = 0.5, alpha = 0.5) +
+#   geom_smooth(method = "loess", formula = "y~x") + 
+#   theme_bw() + 
+#   facet_wrap(~predictors, scales = "free_y")
+```
+
+### Multicollinearity of Explanatory Variables
+```{r multicollinearity}
+# numeric_pred <- full_bank_2 %>% select_if(is.numeric)
+# numeric_pred_names <- colnames(numeric_pred)
+# 
+# ggcorr(data=numeric_pred, label = T, nbreaks=5, label_size = 3, hjust = 0.9, size = 3, layout.exp = 4) +
+#   labs(title = "Multicollinearity of Variables (Pairwise / Pearson's correlation)")
+```
+
+### Outliers and Influential Observations
+
 # Logistic Regression Modeling
 As we have examined the model above, we are looking to see if with a direct marketing campaign, via phone calls, will allow us to predict whether or not a client will subscribe for a term deposit. Before we begin, let's have an initial look at our data and see if we can use logistic regression for prediction classification.
 
@@ -126,7 +195,7 @@ Before we check the assumptions for logistic regression, we will use several mea
 ```{r data-split}
 set.seed(2008)
 
-training_samples <- full_bank_2$y %>% createDataPartition(p=0.8, list = F)
+training_samples <- complete_full_bank$y %>% createDataPartition(p=0.8, list = F)
 
 train.data <- full_bank_2[training_samples,]
 test.data <- full_bank_2[-training_samples,]
@@ -179,36 +248,6 @@ observed.classes <- test.data$y
 mean(predicted.classes == observed.classes)
 
 ```
-
-## Assumptions Investigation
-
-Before we fit the model, we should do preliminary assumptions check for logistic regression
-
-### Binary/Ordinal Response Variable
-
-### Independent Observations
-
-### Linearity of Continuous/Scale Variables vs. Log Odds of Response Variable
-
-```{r linearity-assumption}
-numeric_pred <- test.data %>% select_if(is.numeric)
-numeric_pred_names <- colnames(numeric_pred)
-
-# binding logit and numeric predictors for scatterplots
-linearity_data <- numeric_pred %>%
-  mutate(logit = log(probabilities/(1-probabilities))) %>%
-  gather(key = "predictors", value = "predictor.value", -logit)
-
-ggplot(linearity_data, aes(logit, predictor.value))+
-  geom_point(size = 0.5, alpha = 0.5) +
-  geom_smooth(method = "loess", formula = "y~x") + 
-  theme_bw() + 
-  facet_wrap(~predictors, scales = "free_y")
-```
-
-### Multicollinearity of Explanatory Variables
-
-### Outliers and Influential Observations
 
 ## Interpreting the Parameters
 
