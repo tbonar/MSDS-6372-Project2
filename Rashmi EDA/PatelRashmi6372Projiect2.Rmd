@@ -1,0 +1,542 @@
+---
+title: "Bank 6372 Project 2"
+author: "Rashmi Patel"
+date: "7/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r,warning=FALSE,message=FALSE}
+library(ellipsis)
+library(tidyverse)
+library(corrplot)
+library(mlbench)
+library(caret)
+library(skimr)
+library(mice)
+library(purrr)
+library(ggplot2)
+library(ggthemes)
+library(cowplot)
+library(class)
+library(e1071)
+library(grid)
+library(tidyr)
+library(stringr)
+library(naniar)
+library(car)
+library(MASS)
+library(caret)
+library(ROCR)
+library(glmnet)
+library(bestglm)
+library(car)
+library(ResourceSelection)
+library(randomForest)
+library('SmartEDA')
+library(kableExtra)
+library(DataExplorer)
+```
+# Load the data from Github 
+```{r}
+bank=read_delim("https://raw.githubusercontent.com/RashmiAPatel19/SMU-6372-Applied-Stats/main/Project%202/data/bank-additional-full.csv", ";", escape_double = FALSE, trim_ws = TRUE)
+bank
+```
+# Addressing Summary of the Bank data
+```{r}
+head(bank)
+tail(bank)
+str(bank)
+dim(bank)
+names(bank)
+summary(bank)
+```
+# Addressing missing values
+
+* There is no missing values
+
+```{r}
+# Checking for missing values
+sum(is.na(bank))
+
+```
+
+# Addressing Character Variable and Numeric Variable 
+```{r}
+# Checking the dimensions of the dataset
+dim(bank)
+# Checking the column names of the dataset
+colnames(bank)
+# Looking at the summary of the dataset
+summary(bank)
+# Checking for data types of the columns of the dataset
+str(bank)
+# Checking for number of columns with numeric type
+numeric_var_who=sum(sapply(bank[,1:21],is.numeric))
+numeric_var_who
+# Checking for number of columns with character type
+char_var_who=sum(sapply(bank[,1:21],is.character))
+char_var_who
+# Checking for column names with numeric type
+numeric_varname_who=which(sapply(bank[,1:21],is.numeric))
+numeric_varname_who
+# Checking for column names with character type
+char_varname_who=which(sapply(bank[,1:21],is.character))
+char_varname_who
+```
+
+# Looking at the normality of Numeric Variables
+```{r}
+
+plot_histogram(bank)
+
+```
+
+# Looking at the graph for Response variable
+```{r}
+
+ggplot(bank,aes(y=y,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+
+```
+# Looking at each numeric and character varaible by response variable
+```{r}
+# Age vs Response
+ggplot(bank,aes(y=age,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)
+# Job vs Response
+ggplot(bank,aes(y=job,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle=90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Marital Status vs Response
+ggplot(bank,aes(y=marital,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Education vs Response
+ggplot(bank,aes(y=education,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Housing vs Response
+ggplot(bank,aes(y=housing,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Default vs Response
+ggplot(bank,aes(y=default,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Loan vs Response
+ggplot(bank,aes(y=loan,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Contact vs Response
+ggplot(bank,aes(y=contact,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Day of the week vs Response
+ggplot(bank,aes(y=day_of_week,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Duration vs Response
+ggplot(bank,aes(y=duration,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Campaign vs Response
+ggplot(bank,aes(y=campaign,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Pdays vs Response
+ggplot(bank,aes(y=pdays,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Previous vs Response
+ggplot(bank,aes(y=previous,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Poutcome vs Response
+ggplot(bank,aes(y=poutcome,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Emp.var.Rate vs Response
+ggplot(bank,aes(y=emp.var.rate,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Cons.price.idx vs Response
+ggplot(bank,aes(y=cons.price.idx,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Cons.conf.idx vs Response
+ggplot(bank,aes(y=cons.conf.idx,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Euribor3m vs Response
+ggplot(bank,aes(y=euribor3m,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# nr.employed vs Response
+ggplot(bank,aes(y=nr.employed,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+# Month vs Response
+ggplot(bank,aes(y=month,fill=y))+geom_bar(position="stack",stat="count")+
+  theme(axis.text.x = element_text(angle = 90))+facet_wrap(~y)+
+  geom_text(aes(label=..count..),stat="count",position=position_stack(0.5))
+
+
+```
+# Checking for correlation between variables
+
+* This table shows the correlation between the numerical variables
+
+ - nr.employed and emp.var.rate are 91% correlated. 
+ - nr.employed and euribor3m are 95% correlated.
+ - emp.var.rate and euribor3m are 97% correlated.
+ - cons.price.idx and emp.var.rate are 78% correlated.
+ - cons.price.idx and euribor3m are 69% correlated.
+ - cons.price.idx and nr.employed are 52% correlated.
+ 
+* Later we will examine pairwise multicolinearity within the continuous explanatory variables and VIF to see if which explanatory variables may be redundant.
+
+```{r}
+corrdfTraintable <- bank %>% keep(is.numeric) %>% na.omit %>% cor %>% view
+
+bank %>% keep(is.numeric) %>% na.omit %>% cor %>% corrplot("upper", addCoef.col = "black", number.digits = 2, number.cex = 0.5, method="shade", order = "hclust", tl.srt=45, tl.cex = 0.8)
+
+view(corrdfTraintable)
+
+```
+We don't observe any multicolinearity within the numeric responses, and don't see any need to remove any based on pairwise comparison. 
+
+```{r}
+
+my.cor <- cor(bank %>% keep(is.numeric) %>% na.omit)
+
+library(gplots)
+library(ggplot2)
+heatmap.2(my.cor,col=redgreen(75), 
+          density.info="none", trace="none", dendrogram=c("row"), 
+          symm=F,symkey=T,symbreaks=T, scale="none")
+
+
+#Another option here would be to do PCA among the continous predictors to see
+#if they seperate out.  Or a heatmap.
+pc.result<-prcomp(bank %>% keep(is.numeric) %>% na.omit,scale.=TRUE)
+pc.scores<-pc.result$x
+pc.scores<-data.frame(pc.scores)
+pc.scores$y<-bank$y
+
+
+#Use ggplot2 to plot the first few pc's
+ggplot(data = pc.scores, aes(x = PC1, y = PC2)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+
+ggplot(data = pc.scores, aes(x = PC2, y = PC3)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+
+ggplot(data = pc.scores, aes(x = PC3, y = PC4)) +
+  geom_point(aes(col=y), size=1)+
+  ggtitle("PCA of y")
+
+# we don't really see much separation with PCA
+
+```
+Missing values are disguised as unknown values in the data set and we devised a code to show them all
+
+ default           8597
+ education         1731
+ housing            990
+ loan               990
+ job                330
+ marital             80
+ 
+ For Marital, housing and job it is safe to remove the unknown values as they're so little they won't have an effect on the rest of the distribution
+ 
+ * Looking at default is has no information as it is highly skewed towards "no" as only 3 counts comes up as "yes" so we are removing "default" as well.
+ 
+ 
+ 
+ 
+```{r}
+bank %>% 
+  summarise_all(list(~sum(. == "unknown"))) %>% 
+  gather(key = "variable", value = "nr_unknown") %>% 
+  arrange(-nr_unknown)
+
+summary(bank$job)
+summary(bank$default)
+summary(bank$education)
+summary(bank$loan)
+summary(bank$marital)
+summary(bank$housing)
+
+bank <- subset(bank, job!="unknown")
+bank <- subset(bank, marital!="unknown")
+bank <- subset(bank, housing!="unknown")
+bank <- subset(bank, loan!="unknown")
+bank <- subset(bank, default!="unknown")
+bank <- subset(bank, education!="unknown")
+
+
+```
+```{r}
+
+library("dplyr")
+ShowPieChart <- function(columnBy, columnToShow, titleName)
+{
+  df <- dplyr::group_by(bank, .dots = c(columnBy, columnToShow)) %>%
+    dplyr::summarize(counts = n()) %>%
+    dplyr::mutate(perc = (counts / sum(counts)) * 100) %>%
+    dplyr::arrange_(.dots=c(columnBy, columnToShow))
+ 
+  
+  # preparing the plot
+  ggplot2::ggplot(df, aes('', counts)) +
+    geom_col(
+      position = 'fill',
+      color = 'black',
+      width = 1,
+      aes(fill = y)
+    ) +
+    ggtitle(titleName) +
+    facet_wrap(paste("~",columnBy), labeller = "label_both") +
+    geom_label(
+      aes(label = paste0(round(perc), "%"), group = "y"),
+      position = position_fill(vjust = 0.5),
+      color = 'black',
+      size = 5,
+      show.legend = FALSE
+    ) + scale_fill_discrete(name = "Outcome:") +
+    coord_polar(theta = "y")
+}
+ShowPieChart("job", "y", "Outcome by Job")
+ShowPieChart("marital", "y", "Outcome by Marital Status")
+ShowPieChart("education", "y", "Outcome by Education")
+ShowPieChart("housing", "y", "Outcome by Housing")
+ShowPieChart("default", "y", "Outcome by Credit In Default")
+ShowPieChart("loan", "y", "Outcome by loan status")
+ShowPieChart("contact", "y", "Outcome by Contact")
+ShowPieChart("poutcome", "y", "Outcome by poutcome")
+ 
+```
+
+GLM Logistic
+ Below are the variables that have VIF greater than 10
+-emp.var.rate
+-nr.employed
+-euribor3m
+-cons.price.idx
+
+Because `emp.var.rate`, `nr.employed`, `euribor3m`, and `cons.price.idx` are so highly correlated with each other, and all have high VIFs, we will start by removing `nr.employed` first, and re-evaluate. 
+
+```{r}
+bank.full <- bank %>%
+  mutate(y = ifelse(y=="yes", 1, 0))
+
+cols <- c(colnames(bank))
+
+# removing columns that do not provide any value and the response
+cols <- cols[cols %notin% c("y","default","lgcampaign","pdays")]
+
+fmla.all <- as.formula(paste("y ~ ", paste(cols, collapse= "+")))
+
+bankModel <- glm(fmla.all, bank.full, family = binomial(link="logit"))
+
+(vif(bankModel)[,3])^2
+
+
+# removing columns that are highly correlated and with high VIF
+cols.lowvif <- cols[cols %notin% c("nr.employed","emp.var.rate")]
+
+# creating the formula for a full model after removing the necessary variables
+fmla.lowvif <- as.formula(paste("y ~ ", paste(cols.lowvif, collapse= "+")))
+
+bankModel.lowvif <- glm(fmla.lowvif, bank.full, family = binomial(link="logit"))
+
+# re-examining the VIF after removing variables with high VIF
+(vif(bankModel.lowvif)[,3])^2
+
+```
+
+## Create Training and Test Samples
+From the bank data, we will break the data set up into training and test to fit our basic models
+```{r}
+sample <- sample(c(TRUE, FALSE), nrow(bank.full), replace=TRUE, prob=c(0.8,0.2))
+train_bank <- bank.full[sample, ]
+test_bank <- bank.full[!sample, ]  
+dim(train.bank)
+dim(test.bank)
+```
+
+
+## Checking the Balance of the Data
+Because of the imbalance in the data, we will later down sample to balance the data to train our models.
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+print(bank.full %>% count(bank.full$y))
+```
+
+
+
+## Down sampling the data
+Down sampling the training data set
+```{r}
+# split the dataframe into those who attritioned and those who did not to create a general overall profile of the two
+y0 <- train_bank %>% filter(y == "0")
+y1 <- train_bank %>% filter(y == "1")
+
+
+# downsampling to balance y; Will also use this seed for creating training and test sets
+set.seed(43)
+      
+
+# sampling the data for y=0
+sampleIndices <- sample(seq(1:nrow(y0)),nrow(y1))
+y0sampleDF<- y0[sampleIndices,]
+
+downsample_bank_DF <- rbind(y0sampleDF, y1)
+
+head(downsample_bank_DF)
+```
+
+
+
+## Models
+```{r,warning=FALSE,message=FALSE}
+
+# building the formula for a full model
+fmla.full <- fmla.lowvif
+
+# define intercept-only model
+intercept_only_model <- glm(y ~ 1, data = train_bank, family="binomial")
+
+# define total model
+total_model <- glm(fmla.full, data = train_bank, family="binomial")
+
+
+# set the different models using a variety of feature selection methods.
+bank.back.model <- step(total_model, 
+                          direction = "backward")
+summary(bank.back.model)# AIC=9987.6
+
+bank.step.model <- step(intercept_only_model, 
+                          direction = "both", scope = formula(total_model))
+summary(bank.step.model)# AIC=9987.6
+
+bank.fwd.model <- step(intercept_only_model, 
+                         direction = "forward", scope = formula(total_model))
+summary(bank.fwd.model)#AIC=9987.6
+```
+
+
+## Function to test models against a test set
+```{r}
+# function to test the models. Returns accuracy, sensitivity, and specificity of the test data set
+modelOptimization <- function(train_model, test_dataframe, ResponseCol, threshold){
+      # this function takes the trained model and test data set
+      # and runs the training model on the test. It returns the accuracy, sensitivity,
+      # and specificity for each model as a named list
+      # parameters: 
+          # train_model: the predictive model fit to a training set
+          # test_dataframe: the test set of data as a dataframe
+          # ResponseCol: the name of the response column represented as a string i.e. "y"
+          # threshold: The threshold for which a prediction is considered correct i.e. above .5 or above .1
+  
+  
+      cols <- as.vector(strsplit(Reduce(paste, deparse(train_model[["terms"]][[3]])), " +")[[1]])
+      cols <- c(cols[cols %notin% c("+")])
+
+      # testing the model's prediction
+      test_dataframe$pred_response <- predict(train_model,test_dataframe[, cols, drop=FALSE],type="response")
+      test_dataframe$pred_response = ifelse(test_dataframe$pred_response > threshold,"1","0")
+      
+      # create table for the confusion matrix
+      cmtable <- table(test_dataframe$pred_response,test_dataframe[[ResponseCol]])
+      
+      # if there are missing rows (if the model has only predicted all yes or all no)
+      # then append yes or no row of 0's
+      if(nrow(cmtable) < 2) {
+        if ("Yes" %in% rownames(cmtable))
+          {
+            cmtable <- as.table(rbind(cmtable, "0"=as.integer(c(0, 0))))
+
+          }
+        else
+          {
+            cmtable <- as.table(rbind(cmtable, "1"=as.integer(c(0, 0))))
+          }
+      }
+      
+      CM = confusionMatrix(cmtable)
+      
+      misclassification <- (cmtable[1,2]+cmtable[2,1])/(cmtable[1,1]+cmtable[2,2]+cmtable[1,2]+cmtable[2,1])
+      
+      type1error_rate <- (cmtable[1,2])/(cmtable[1,1]+cmtable[2,2]+cmtable[1,2]+cmtable[2,1])
+      type2error_rate <- (cmtable[2,1])/(cmtable[1,1]+cmtable[2,2]+cmtable[1,2]+cmtable[2,1])
+      
+      returnlist <- c(CM$overall["Accuracy"], CM$byClass["Sensitivity"], CM$byClass["Specificity"], Misclassification=misclassification, Type1error_rate=type1error_rate, Type2error_rate=type2error_rate)
+      
+      df <- data.frame(matrix(unlist(returnlist), nrow=1, byrow=T),stringsAsFactors=FALSE)
+      
+      return(returnlist)
+      
+}
+
+```
+
+
+## Applying the trained models to the test sets
+And reviewing their predictive performance against the test set with a threshold of .5
+```{r}
+threshold <- .5
+
+# adding the output from modelOptimization function to a dataframe to compare statistics about each model.
+bank_back_model_fmla <- bank_back_model[["formula"]]
+back_model_row <- c(Model="Back Model", modelOptimization(bank_back_model,test_bank,"y", threshold), fmla=bank_back_model_fmla)
+
+
+bank_step_model_fmla <- bank_step_model[["formula"]]
+step_model_row <- c(Model="Step Model", modelOptimization(bank_step_model,test_bank,"y", threshold), fmla=bank_step_model_fmla)
+
+
+bank_fwd_model_fmla <- bank_fwd_model[["formula"]]
+fwd_model_row <- c(Model="Fwd Model", modelOptimization(bank_fwd_model,test_bank,"y", threshold), fmla=bank_fwd_model_fmla)
+
+model_comparison_df <- rbind(back_model_row, step_model_row, fwd_model_row)
+model_comparison_df <- data.frame(model_comparison_df)
+
+view(model_comparison_df)
+```
+All 3 feature selection methods reduced the variables down to the same set of variables for each, and all three produced the same accuracy, misclassifaction, sensitivity, specificity, false positive rate, and false negative rate when applied to a test data set. They are the same by all definitions.
+
+The model we will move forward with for interpretation is as follows:
+`y ~ euribor3m + month + poutcome + job + campaign + marital + previous + cons.conf.idx + cons.price.idx`  
+  
+  
+#### Summary of the main interpretable model
+against the training data set  
+```{r,echo=FALSE,warning=FALSE,message=FALSE}
+fmla.main <- as.formula(bank_fwd_model[["formula"]])
+
+model.main <- glm(fmla.main, data = train_bank, family = binomial(link="logit"))
+
+summary(model.main)
+```
+
+
+```{r}
+(vif(model.main)[,3])^2
+hoslem.test(model.main$y, fitted(model.main), g=10)
+exp(cbind("Odds ratio" = coef(model.main), confint.default(model.main, level = 0.95)))
+vif(model.main)
+```
+
+
+## Residual Diagnostics
+```{r}
+plot(model.main)
+```
+
+
