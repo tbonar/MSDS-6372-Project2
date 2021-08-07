@@ -148,6 +148,22 @@ theme(axis.text.x = element_text(angle=90))
 ```
 Now we have no missing data.
 
+## Addressing Character Variable and Numeric Variable
+```{r}
+# Checking for number of columns with numeric type
+numeric_var_who=sum(sapply(complete_full_bank[,1:21],is.numeric))
+numeric_var_who
+# Checking for number of columns with character type
+char_var_who=sum(sapply(complete_full_bank[,1:21],is.character))
+char_var_who
+# Checking for column names with numeric type
+numeric_varname_who=which(sapply(complete_full_bank[,1:21],is.numeric))
+numeric_varname_who
+# Checking for column names with character type
+char_varname_who=which(sapply(complete_full_bank[,1:21],is.character))
+char_varname_who
+```
+
 ### Is our Response Variables Unbalanced?
 
 ```{r is-data-balanced}
