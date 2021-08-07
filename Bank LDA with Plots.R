@@ -5,6 +5,7 @@ library(naniar)
 library(GGally)
 library(funModeling)
 library(Hmisc)
+library(ROCC)
 
 #find numeric columns
 str(full_bank_2)
