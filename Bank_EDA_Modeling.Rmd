@@ -458,4 +458,9 @@ predicted.classes <- ifelse(probabilities > 0.5, "no", "yes")
 # Accuracy Rate
 observed.classes <- test.data$y
 mean(predicted.classes == observed.classes)
+
+assess.glmnet(l.model, newx = x.test, newy = test.data$y)
+confusion.glmnet(l.model, newx = x.test, newy = test.data$y)
+lasso.roc <- roc.glmnet(l.model, newx = x.test, newy = test.data$y)
+plot(lasso.roc)
 ```
