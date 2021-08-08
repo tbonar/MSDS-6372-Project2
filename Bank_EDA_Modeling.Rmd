@@ -7,12 +7,12 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
 library(tidyverse) # Data handling
 library(naniar) # Viz on Missing Data
 library(GGally) # Graphs!
 library(DataExplorer) # More Graphs!
 library(ggplot2) # More more Graphs!
+library(cowplot) # ggplot2 defaults
 library(funModeling) # Helpful Functions for EDA Function
 library(Hmisc) # Helpful Functions for EDA Function
 library(caret) # Data Partitioning
@@ -20,6 +20,7 @@ library(glmnet) # Modeling
 library(coefplot) # Coefficient modeling of glmnet objects
 library(corrplot) # Correlation Plotting
 library(car) # vif function
+library(pROC) # ROC Curves
 
 setwd(".")
 basic_eda <- function(data) # Sample Function Source: https://blog.datascienceheroes.com/exploratory-data-analysis-in-r-intro/
@@ -34,6 +35,46 @@ basic_eda <- function(data) # Sample Function Source: https://blog.datasciencehe
 
 # logit^{-1}: Can use to convert results of logistic regression to probability
 invlogit <- function(x) {1 / (1 + exp(-x))}
+
+# Pseudo R^2
+
+psuedo_rsq <- function(glmmodel) {
+# Creating Psuedo R^2
+full.ll.null <- glmmodel$null.deviance/-2
+full.ll.proposed <- glmmodel$deviance/-2
+
+full.ll.rsq <- (full.ll.null - full.ll.proposed) / full.ll.null
+
+# Chi-square distribution p-value
+pchisq <- 1 - pchisq(2*(full.ll.proposed - full.ll.null), df = (length(full.logistic.fit$coefficients)-1))
+psuedo_rsq <- data.frame(
+  psuedo_rsq=full.ll.rsq,
+  chisq_pval=pchisq)
+
+print(psuedo_rsq)
+}
+
+s_plot <- function(glmmodel,bank_data){
+  predicted.data <- data.frame(
+  probability.of.subscribe=glmmodel$fitted.values,
+  bank.term.deposit=bank_data$y)
+ 
+  predicted.data <- predicted.data[
+    order(predicted.data$probability.of.subscribe, decreasing=FALSE),]
+  predicted.data$rank <- 1:nrow(predicted.data)
+
+## Lastly, we can plot the predicted probabilities for each sample subscribing
+## and color by whether or not they actually subscribed
+ggplot(data=predicted.data, aes(x=rank, y=probability.of.subscribe)) +
+  geom_point(aes(color=bank.term.deposit), alpha=1, shape=4, stroke=2) +
+  xlab("Index") +
+  ylab("Predicted probability of Subscribing")
+}
+
+get_logistic_pred = function(mod, data, res = "y", pos = 1, neg = 0, cut = 0.5) {
+  probs = predict(mod, newdata = data, type = "response")
+  ifelse(probs > cut, pos, neg)
+}
 ```
 # Introduction
 The goal of this paper is to investigate banking data via an exploratory data analysis. Once we have initially examined the data, we will then move forward with attempting a classification model via logistic regression for predicting whether or not a client will subscribe to a banking institution given a direct marketing campaign taking place.
@@ -125,10 +166,10 @@ As we can see in the initial EDA, we have a small percentage of data that is mar
 ```{r unknown-transformation}
 full_bank[full_bank=="unknown"] <- NA
 
-basic_eda(full_bank)
+freq(full_bank, plot = F) 
 
 # Create a bird's eye view of missing data using naniar library if missing data exists
-vis_miss(full_bank, cluster = F) + # Wi
+vis_miss(full_bank, cluster = F) +
 labs(title = "NAs in Bank Data from May 2008 - Nov 2010") +
 theme(axis.text.x = element_text(angle=90))
 
@@ -149,7 +190,7 @@ theme(axis.text.x = element_text(angle=90))
 Now we have no missing data.
 
 ## Addressing Character Variable and Numeric Variable
-```{r}
+```{r} 
 # Checking for number of columns with numeric type
 numeric_var_who=sum(sapply(complete_full_bank[,1:21],is.numeric))
 numeric_var_who
@@ -169,23 +210,79 @@ char_varname_who
 ```{r is-data-balanced}
 prop.table(table(complete_full_bank$y))
 freq(complete_full_bank, input="y")
+
+plot_bar(data=complete_full_bank, by = "y", nrow=2, ncol=2)
 ```
 
 Looking closer at our response variable, we have a significant lower percentage of yes's versus no's (12.66% yes's to 87.34% no's). With this in mind, we'll need to ensure either our sampling is weighted, or consider algorithms that can oversample or undersample when fitting our logistic regression model, otherwise we may introduce bias and lower our accuracy on predicting when a client successfully subscribes to a bank term deposit.
+
+Additionally, we do not have any representation of those who have defaulted on their credit and if they choose not to subscribe to a bank term deposit. This variable could pose some issues when analyzing how defaults affect a client's desire to subscribe. Later we will look further into this and see if this predictor more closely when creating our models.
 
 ### Examining Normality of Numeric Variables
 ```{r normality-numeric}
 plot_num(complete_full_bank)
 ```
-Looking closer at the histograms of the scale variables, it appears there are some potential normality issues.
+Looking closer at the histograms of the scale variables, it appears there are some potential normality issues, particularly the pdays.
 
-```{r Response-vs-Predictors}
-plot_bar(data=complete_full_bank, by = "y", nrow=2, ncol=2)
+## Initial Full Logistic Regression Model
+Before we go into automatic model variable selection tools, we should attempt to understand the full model and how our explanatory variables may come into play and assess whether the assumptions of logistic regression are met or not.
+
+```{r full-model}
+full.logistic.fit <- glm(y ~ ., data = complete_full_bank, family="binomial")
+summary(full.logistic.fit) # Full Model Statistics
+
+psuedo_rsq(full.logistic.fit) # Psuedo R Statistic w/ Chi-Sq P-value
+
+library(ROCit)
+
+full.measures <- measureit(score = full.logistic.fit$fitted.values, class = full.logistic.fit$y,
+                           measure = c("ACC", "SENS", "FSCR"))
+
+plot(full.measures$ACC~full.measures$Cutoff, type = "l")
+roc_empirical <- rocit(score = full.logistic.fit$fitted.values, class = full.logistic.fit$y, negref = "0")
+
+plot(roc_empirical, values=F)
 ```
+### Interpreting the coefficients
+The following variables are not useful predictors as they contain moderate to large p-values depending on the confidence level we seek to achieve:
+* age w/ p-value of 0.42
+* Jobs:
+  + entrepreneur -- p-value of 0.22
+  + maid -- p-value of 0.81
+  + management -- p-value of 0.82
+  + employed -- p-value of 0.52
+  + technician -- p-value of 0.63
+  + unemployed -- p-value of 0.82
+* Martial statuses of married (p-value of .96) and single (p-value of .75)
+* Education Levels:
+  + basic of 6 years -- p-value of .42
+  + basic of 9 years -- p-value of .82
+  + high school -- p-value of .40
+  + illiterate -- p-value of .06
+  + professional course -- p-value of 0.24
+* Defaulting on Credit (p-values of .94)
+* Housing Loan (p-value of .64)
+* A loan in general (p-value of .36)
+* Last Month of Contact During Campaign:
+  + July -- p-value of .66
+  + October -- p-value of  .14
+  + December -- p-value of .31
+* Day of the Week of Contact During Campaign:
+  + Monday -- p-value of .35
+  + Thursday -- p-value of.08
+* The Number of Previous Contacts Performed Before the Campaign -- p-value of .41
+
+Additionally, we can observe that for our full model, our residual deviance is 13,902 with an AIC of 13,998. We can also see that our psuedo R^2 value is 0.39975 with an extremely small Chi-squared p-value that it is nonetheless 0.
+
+Lastly, we can see how the full model predicted by the following graphic:
+```{r full-model-s-line}
+s_plot(full.logistic.fit, complete_full_bank)
+```
+As you can see, there looks to be some scattered mis-classifications within the yes section. This is perhaps due to unbalanced data that we need to sort out in our refined model with sampling methods as previously mentioned.
 
 ## Assumptions Investigation
 
-Before we fit the model, we should do preliminary assumptions check for logistic regression
+Now that we understand more about our data and logistic regression model, we should do some preliminary assumptions check for logistic regression. These metrics are important as we will use them to compare our later simpler logistic regression model for performance evaluation.
 
 ### Binary/Ordinal Response Variable
 ```{r response-variable-assumption}
@@ -194,65 +291,70 @@ levels(complete_full_bank$y)
 ```
 As you can see above, our response variable, y, consists of two levels, resulting in a binary response. We will move forward with a binary logistic regression model instead of an ordinal logistic regression model. 
 
-### Independent Observations
+### Influential Observations
 ```{r residuals}
-
+plot(full.logistic.fit, which = 4, id.n = 3)
 ```
+As we can see from our Cook's Distance visualization, it appears we may have 3 observations of influence between 0.08 and 0.012. However, despite these are small values, we will elect to remove them as an extra precaution.
+
+```{r remove-influential}
+complete_full_bank_2 <- complete_full_bank[-c(18463,27544,27535)]
+```
+
 
 ### Linearity of Continuous/Scale Variables vs. Log Odds of Response Variable
 
 ```{r linearity-assumption}
-# numeric_pred <- test.data %>% select_if(is.numeric)
-# numeric_pred_names <- colnames(numeric_pred)
-# 
-# # binding logit and numeric predictors for scatterplots
-# linearity_data <- numeric_pred %>%
-#   mutate(logit = log(probabilities/(1-probabilities))) %>%
-#   gather(key = "predictors", value = "predictor.value", -logit)
-# 
-# ggplot(linearity_data, aes(logit, predictor.value))+
-#   geom_point(size = 0.5, alpha = 0.5) +
-#   geom_smooth(method = "loess", formula = "y~x") + 
-#   theme_bw() + 
-#   facet_wrap(~predictors, scales = "free_y")
+numeric_pred <- complete_full_bank %>% select_if(is.numeric)
+numeric_pred_names <- colnames(numeric_pred)
+
+# binding logit and numeric predictors for scatterplots
+linearity_data <- numeric_pred %>%
+  mutate(logit = log(full.logistic.fit$fitted.values/(1-full.logistic.fit$fitted.values))) %>%
+  gather(key = "predictors", value = "predictor.value", -logit)
+
+ggplot(linearity_data, aes(logit, predictor.value))+
+  geom_point(size = 0.5, alpha = 0.5) +
+  geom_smooth(method = "loess", formula = "y~x") +
+  theme_bw() +
+  facet_wrap(~predictors, scales = "free_y")
 ```
+We can observe from our plot that a number of our variables do not follow a linear trend. However, we do see that duration and potentially, campaign, have a linear trend associated with subscribing to a bank term deposit.
+
+For all other variables, transformations may be beneficial for classifying, but for now we will leave them as is. 
 
 ### Multicollinearity of Explanatory Variables
-# Checking for correlation between variables
 
-* This table shows the correlation between the numerical variables
+The below correlation table shows the correlation between the numerical variables:
+* nr.employed and emp.var.rate are 91% correlated. 
+* nr.employed and euribor3m are 95% correlated.
+* emp.var.rate and euribor3m are 97% correlated.
+* cons.price.idx and emp.var.rate are 78% correlated.
+* cons.price.idx and euribor3m are 69% correlated.
+* cons.price.idx and nr.employed are 52% correlated.
 
- - nr.employed and emp.var.rate are 91% correlated. 
- - nr.employed and euribor3m are 95% correlated.
- - emp.var.rate and euribor3m are 97% correlated.
- - cons.price.idx and emp.var.rate are 78% correlated.
- - cons.price.idx and euribor3m are 69% correlated.
- - cons.price.idx and nr.employed are 52% correlated.
- 
-* Later we will examine pairwise multicolinearity within the continuous explanatory variables and VIF to see if which explanatory variables may be redundant.
+Furthermore, we do have a moderate multicollinearity issue with some variables for previous and pdays. We may want to examine them closer.
 
 ```{r Correlation}
-corrdfTraintable <- complete_full_bank %>% 
-  keep(is.numeric) %>%
-  cor
-
-corrdfTraintable
-
-complete_full_bank %>% keep(is.numeric) %>% 
-  cor %>% 
-  corrplot("upper",
-           addCoef.col = "black",
-           number.digits = 2,
-           number.cex = 0.5,
-           method="shade",
-           order = "hclust",
-           tl.srt=45,
-           tl.cex = 0.8)
-
-ggcorr(data=complete_full_bank, label = T, nbreaks=5, label_size = 3, hjust = 0.9, size = 3, layout.exp = 4) +
+ggcorr(data=numeric_pred, label = T, nbreaks=5, label_size = 3, hjust = 0.9, size = 3, layout.exp = 4) +
   labs(title = "Multicollinearity of Variables (Pairwise / Pearson's correlation)")
 ```
-We don't observe any multicolinearity within the numeric responses, and don't see any need to remove any based on pairwise comparison. 
+For variables with moderate to large Pearson's correlation, we'll need to examine the VIF to see which variables may be need to be removed due to a problematic amount of collinearity.
+```{r VIF}
+vif(full.logistic.fit)
+```
+As a rule of thumb, we should pay attention to variables with a VIF higher than 5 or 10, but we'll use 5 for logistic regression. The following variables are showing significant VIF values:
+* job
+* month
+* pdays
+* poutcome
+* emp.var.rate
+* cons.price.idx
+* cons.conf.idx
+* euribor3m
+* nr.employed
+
+With our earlier analysis on the coefficients, we can see why some predictors were not as significant or useful (e.g. jobs, month, etc.). To refine our model further, we'll remove the above variables.
 
 ## PCA Examination
 ```{r PCA}
@@ -289,45 +391,23 @@ ggplot(data = pc.scores, aes(x = PC3, y = PC4)) +
 ```
 There does not seem to be a large separation with PCA.
 
-### GLM Logistic
- Below are the variables that have VIF greater than 10
-* emp.var.rate
-* nr.employed
-* euribor3m
-* cons.price.idx
+## Second Logistic Regression Model
+```{r lr-model-2}
+logistic.fit.2 <- glm(y ~ . -nr.employed -euribor3m -cons.conf.idx -cons.price.idx -emp.var.rate -poutcome -pdays -month -job, data = complete_full_bank, family="binomial")
 
-Because `emp.var.rate`, `nr.employed`, `euribor3m`, and `cons.price.idx` are so highly correlated with each other, and all have high VIFs, we will start by removing `nr.employed` first, and re-evaluate. 
-
-```{r VIF}
-'%!in%' <- function(x,y)!('%in%'(x,y))
-
-cols <- c(colnames(complete_full_bank))
-# removing columns that do not provide any value and the response
-cols <- cols[cols %!in% c("y","default","lgcampaign","pdays")]
-fmla.all <- as.formula(paste("y ~ ", paste(cols, collapse= "+")))
-bankModel <- glm(fmla.all, complete_full_bank, family = binomial(link="logit"))
-(vif(bankModel)[,3])^2
-# removing columns that are highly correlated and with high VIF
-cols.lowvif <- cols[cols %!in% c("nr.employed","emp.var.rate")]
-# creating the formula for a full model after removing the necessary variables
-fmla.lowvif <- as.formula(paste("y ~ ", paste(cols.lowvif, collapse= "+")))
-bankModel.lowvif <- glm(fmla.lowvif, complete_full_bank, family = binomial(link="logit"))
-# re-examining the VIF after removing variables with high VIF
-(vif(bankModel.lowvif)[,3])^2
+summary(logistic.fit.2)
+psuedo_rsq(logistic.fit.2)
+s_plot(logistic.fit.2, complete_full_bank_2)
 ```
-
-### Outliers and Influential Observations
-
-# Logistic Regression Modeling
-As we have examined the model above, we are looking to see if with a direct marketing campaign, via phone calls, will allow us to predict whether or not a client will subscribe for a term deposit. Before we begin, let's have an initial look at our data and see if we can use logistic regression for prediction classification.
+After adjusting the model for multicollinearity problems, we can now see that our model has worsened in performance. However, it does seem that our s-plot is starting to form when compared with the initial full model.
 
 ## Model Selection
-Before we check the assumptions for logistic regression, we will use several means of automatic model selection to see what out of the 21 variables may be more useful for our logistic regression model. Once we've reduced our variables, we can then proceed forward with checking the assumptions. For our models, we'll use a 80/20 split of the data for predictions.
+As we can see, manually modifying and tweaking a model can have adverse results. With this we'll introduced a third and final model to do a comparison with using automatic variable selection method, LASSO, for this, we'll need to create a sampling of test data to train the model and then a test set to predict with. We'll use a 80:20 split and balance our data.
 
 ```{r data-split}
 set.seed(2008)
 
-training_samples <- complete_full_bank$y %>% createDataPartition(p=0.8, list = F)
+training_samples <- complete_full_bank_2$y %>% createDataPartition(p=0.8, list = F)
 
 train.data <- complete_full_bank[training_samples,]
 test.data <- complete_full_bank[-training_samples,]
@@ -378,13 +458,4 @@ predicted.classes <- ifelse(probabilities > 0.5, "no", "yes")
 # Accuracy Rate
 observed.classes <- test.data$y
 mean(predicted.classes == observed.classes)
-
 ```
-
-## Interpreting the Parameters
-
-
-## Conclusion
-
-
-
